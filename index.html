@@ -59,11 +59,26 @@
   .btn-danger:hover { background: var(--danger-light); }
   .btn-sm { padding: 4px 10px; font-size: 12px; }
 
-  .url-base-row { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 13px; flex-wrap: wrap; }
-  .url-base-row label { font-weight: 600; color: var(--mcgill-green); }
-  .url-base-row input { flex: 0 1 300px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; font-family: monospace; }
-  .url-base-row input:focus { outline: none; border-color: var(--mcgill-green); box-shadow: 0 0 0 2px rgba(26,86,50,.15); }
-  .url-base-row .hint { color: var(--text-light); font-size: 11px; }
+  .settings-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 13px; flex-wrap: wrap; }
+  .settings-row label { font-weight: 600; color: var(--mcgill-green); white-space: nowrap; }
+  .settings-row input[type="text"] { flex: 0 1 300px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; font-family: monospace; }
+  .settings-row input[type="text"]:focus { outline: none; border-color: var(--mcgill-green); box-shadow: 0 0 0 2px rgba(26,86,50,.15); }
+  .settings-row .hint { color: var(--text-light); font-size: 11px; }
+  .settings-row input[type="text"].name-input { font-family: inherit; flex: 0 1 200px; }
+
+  .toggle-wrap { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .toggle-switch { position: relative; width: 36px; height: 20px; display: inline-block; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: #ccc; border-radius: 20px; transition: .2s; }
+  .toggle-slider:before { content: ''; position: absolute; height: 14px; width: 14px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+  .toggle-switch input:checked + .toggle-slider { background: var(--mcgill-green); }
+  .toggle-switch input:checked + .toggle-slider:before { transform: translateX(16px); }
+
+  .logo-upload-wrap { display: flex; align-items: center; gap: 8px; }
+  .logo-upload-wrap .logo-preview { height: 24px; max-width: 80px; object-fit: contain; border: 1px solid var(--border); border-radius: 3px; background: #fff; }
+  .logo-upload-wrap .btn-sm { font-size: 11px; padding: 3px 8px; }
+
+  .sheet-margin-text { position: absolute; left: 0; right: 0; text-align: center; font-size: 12px; font-weight: 700; color: #333; font-family: 'Segoe UI', Arial, sans-serif; letter-spacing: 0.3px; }
 
   .data-table-wrap { overflow-x: auto; }
   table.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -115,7 +130,6 @@
     max-height: 16px;
     object-fit: contain;
     display: block;
-    margin-top: 4px;
   }
   .label-left .ll-qr {
     width: 30px; height: 30px;
@@ -178,7 +192,7 @@
   @media print {
     html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     header, .no-print, .card h2, .upload-zone, .table-actions, .preview-controls,
-    .data-table-wrap, #upload-section, #data-section, .sheet-page-num, .url-base-row { display: none !important; }
+    .data-table-wrap, #upload-section, #data-section, .sheet-page-num, .settings-row { display: none !important; }
     .container { max-width: none; padding: 0; margin: 0; }
     .card { box-shadow: none; padding: 0; margin: 0; border: none; border-radius: 0; }
     .sheets-wrap { gap: 0; }
@@ -214,7 +228,7 @@
   <img id="headerLogo" alt="McGill Hose &amp; Coupling">
   <div>
     <h1>VMI Bin Label Maker</h1>
-    <div class="subtitle">Avery 94216 &mdash; 3 &times; 10 (30/sheet) &mdash; 2&#x2033; &times; &#xBE;&#x2033; &mdash; v5</div>
+    <div class="subtitle">Avery 94216 &mdash; 3 &times; 10 (30/sheet) &mdash; 2&#x2033; &times; &#xBE;&#x2033; &mdash; v5.3</div>
   </div>
 </header>
 
@@ -233,10 +247,33 @@
 
   <div class="card" id="data-section" style="display:none;">
     <h2>2. Review &amp; Edit <span class="badge" id="labelCount">0</span></h2>
-    <div class="url-base-row">
+    <div class="settings-row">
       <label>QR Base URL:</label>
       <input type="text" id="qrBaseUrl" value="https://mcgillhose.com" placeholder="https://mcgillhose.com">
-      <span class="hint">Each label&#39;s QR = base URL + path from table</span>
+      <span class="hint">Each label&#39;s QR = base URL + path suffix from table</span>
+    </div>
+    <div class="settings-row">
+      <div class="toggle-wrap">
+        <label class="toggle-switch"><input type="checkbox" id="swapSkuToggle"><span class="toggle-slider"></span></label>
+        <span>Swap SKU columns</span>
+        <span class="hint">(moves primary &harr; alt)</span>
+      </div>
+    </div>
+    <div class="settings-row">
+      <label>Customer:</label>
+      <input type="text" id="customerName" class="name-input" placeholder="Customer name (prints on sheet)">
+      <label style="margin-left:8px">Sales Rep:</label>
+      <input type="text" id="salesRep" class="name-input" placeholder="Rep name (prints on sheet)">
+    </div>
+    <div class="settings-row">
+      <label>Custom Logo:</label>
+      <div class="logo-upload-wrap">
+        <img id="customLogoPreview" class="logo-preview" style="display:none" alt="Custom logo">
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('logoFileInput').click()">Upload Logo</button>
+        <button class="btn btn-secondary btn-sm" id="clearLogoBtn" style="display:none" onclick="clearCustomLogo()">Clear</button>
+        <input type="file" id="logoFileInput" accept="image/*" hidden>
+        <span class="hint">Overrides McGill logo on labels</span>
+      </div>
     </div>
     <div class="data-table-wrap">
       <table class="data-table" id="dataTable">
@@ -319,7 +356,31 @@ function makeQR(url) {
   } catch(e) { console.warn('QR error:', e); return null; }
 }
 
-// (stripTopLogo removed — direct image extraction makes it unnecessary)
+// Custom logo upload
+var customLogoB64 = null;
+document.getElementById('logoFileInput').addEventListener('change', function(e) {
+  if (!e.target.files.length) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    customLogoB64 = ev.target.result;
+    var preview = document.getElementById('customLogoPreview');
+    preview.src = customLogoB64;
+    preview.style.display = '';
+    document.getElementById('clearLogoBtn').style.display = '';
+  };
+  reader.readAsDataURL(e.target.files[0]);
+});
+function clearCustomLogo() {
+  customLogoB64 = null;
+  document.getElementById('customLogoPreview').style.display = 'none';
+  document.getElementById('clearLogoBtn').style.display = 'none';
+  document.getElementById('logoFileInput').value = '';
+}
+
+// Re-render table when swap toggle changes (to update yellow highlights)
+document.getElementById('swapSkuToggle').addEventListener('change', function() {
+  if (labels.length) renderTable();
+});
 
 // Upload handlers
 var dropZone = document.getElementById('dropZone');
@@ -404,29 +465,18 @@ async function parsePDF(file) {
       nearby.sort(function(a, b) { return a.y - b.y || a.x - b.x; });
       var descText = nearby.map(function(n) { return n.text; }).join(' ').replace(/\s+/g, ' ').trim();
 
-      var sku, altSku, description;
-      if (isSku) {
-        sku = anchor.text;
-        var pipeIdx = descText.lastIndexOf('|');
-        if (pipeIdx > 0) {
-          altSku = descText.substring(pipeIdx + 1).trim();
-          description = descText.substring(0, pipeIdx).trim();
-          description = description.replace(/\s*(Size|O\.D\.|Connection Size)\s*$/i, '').trim();
-        } else {
-          altSku = '';
-          description = descText;
-        }
+      // Always respect the Danfoss label's primary position:
+      // bold anchor = primary SKU, text after "|" = alt SKU
+      var sku = anchor.text;
+      var altSku = '';
+      var description;
+      var pipeIdx = descText.lastIndexOf('|');
+      if (pipeIdx > 0) {
+        altSku = descText.substring(pipeIdx + 1).trim();
+        description = descText.substring(0, pipeIdx).trim();
+        description = description.replace(/\s*(Size|O\.D\.|Connection Size)\s*$/i, '').trim();
       } else {
-        altSku = anchor.text;
-        var pipeIdx = descText.lastIndexOf('|');
-        if (pipeIdx > 0) {
-          sku = descText.substring(pipeIdx + 1).trim();
-          description = descText.substring(0, pipeIdx).trim();
-          description = description.replace(/\s*(Size|O\.D\.|Connection Size)\s*$/i, '').trim();
-        } else {
-          sku = altSku;
-          description = descText;
-        }
+        description = descText;
       }
 
       parsed.push({
@@ -549,17 +599,24 @@ function renderTable() {
   document.getElementById('labelCount').textContent=labels.length;
   var tbody=document.getElementById('dataBody');
   tbody.innerHTML='';
+  var swapOn = document.getElementById('swapSkuToggle').checked;
   labels.forEach(function(l,idx){
     var tr=document.createElement('tr');
+    var noAlt = !l.altSku || !l.altSku.trim();
+    // Highlight rows with no alt SKU when swap is on — they can't be swapped
+    if (swapOn && noAlt) {
+      tr.style.background = '#fffde7';
+    }
     var imgCell = l.imageData
       ? '<img class="img-thumb" src="'+l.imageData+'" alt="">'
       : '<span style="color:#ccc;font-size:10px">\u2014</span>';
+    var altPlaceholder = (swapOn && noAlt) ? 'No alt SKU — kept as-is' : 'Optional';
     tr.innerHTML=
       '<td style="color:var(--text-light);font-size:11px;text-align:center">'+(idx+1)+'</td>'+
       '<td style="text-align:center">'+imgCell+'</td>'+
       '<td><input type="text" value="'+esc(l.sku)+'" data-idx="'+idx+'" data-field="sku"></td>'+
       '<td><input type="text" value="'+esc(l.description)+'" data-idx="'+idx+'" data-field="description"></td>'+
-      '<td><input type="text" value="'+esc(l.altSku)+'" data-idx="'+idx+'" data-field="altSku" placeholder="Optional"></td>'+
+      '<td><input type="text" value="'+esc(l.altSku)+'" data-idx="'+idx+'" data-field="altSku" placeholder="'+altPlaceholder+'"></td>'+
       '<td><input type="text" value="'+esc(l.qrPath||'')+'" data-idx="'+idx+'" data-field="qrPath" placeholder="/hydraulics" style="font-family:monospace;font-size:12px"></td>'+
       '<td><input type="number" value="'+l.qty+'" min="1" max="100" data-idx="'+idx+'" data-field="qty"></td>'+
       '<td style="text-align:center"><button class="btn btn-danger btn-sm" onclick="removeRow('+idx+')">&times;</button></td>';
@@ -569,6 +626,8 @@ function renderTable() {
     inp.addEventListener('change',function(){
       var i=+inp.dataset.idx,f=inp.dataset.field;
       labels[i][f]=f==='qty'?(parseInt(inp.value)||1):inp.value;
+      // Re-render if altSku changed while swap is on (to update highlights)
+      if (f === 'altSku' && document.getElementById('swapSkuToggle').checked) renderTable();
     });
   });
 }
@@ -589,6 +648,10 @@ function generatePreview() {
   });
 
   var baseUrl = document.getElementById('qrBaseUrl').value.trim() || 'https://mcgillhose.com';
+  var swapSku = document.getElementById('swapSkuToggle').checked;
+  var customerName = document.getElementById('customerName').value.trim();
+  var salesRep = document.getElementById('salesRep').value.trim();
+  var logoSrc = customLogoB64 || LOGO_B64;
 
   var flat=[];
   labels.forEach(function(l){for(var q=0;q<l.qty;q++) flat.push(l);});
@@ -607,6 +670,22 @@ function generatePreview() {
     var sheet=document.createElement('div');
     sheet.className='sheet-page';
 
+    // Margin text: customer name at top, sales rep at bottom
+    if (customerName) {
+      var topText = document.createElement('div');
+      topText.className = 'sheet-margin-text';
+      topText.style.top = '0.2in';
+      topText.textContent = customerName;
+      sheet.appendChild(topText);
+    }
+    if (salesRep) {
+      var botText = document.createElement('div');
+      botText.className = 'sheet-margin-text';
+      botText.style.bottom = '0.15in';
+      botText.textContent = salesRep;
+      sheet.appendChild(botText);
+    }
+
     for(var row=0;row<AVERY.rows;row++){
       for(var col=0;col<AVERY.cols;col++){
         if(li>=flat.length) break;
@@ -615,6 +694,12 @@ function generatePreview() {
         cell.className='label-cell';
         cell.style.left=(AVERY.marginLeft+col*AVERY.colPitch)+'in';
         cell.style.top=(AVERY.marginTop+row*AVERY.rowPitch)+'in';
+
+        // Determine primary/alt based on swap toggle
+        // If swap is on but there's no alt SKU, keep primary where it is
+        var canSwap = swapSku && l.altSku && l.altSku.trim();
+        var primarySku = canSwap ? l.altSku : l.sku;
+        var secondarySku = canSwap ? l.sku : l.altSku;
 
         // Product image
         var imgHtml = l.imageData
@@ -630,13 +715,13 @@ function generatePreview() {
 
         cell.innerHTML=
           '<div class="label-left">'+
-            '<img class="ll-logo" src="'+LOGO_B64+'" alt="McGill">'+
+            '<img class="ll-logo" src="'+logoSrc+'" alt="Logo">'+
             '<div class="ll-qr">'+qrHtml+'</div>'+
           '</div>'+
           '<div class="label-mid">'+
-            '<div class="lm-sku">'+esc(l.sku)+'</div>'+
+            '<div class="lm-sku">'+esc(primarySku||'')+'</div>'+
             '<div class="lm-desc">'+esc(l.description)+'</div>'+
-            (l.altSku?'<div class="lm-alt">'+esc(l.altSku)+'</div>':'')+
+            (secondarySku?'<div class="lm-alt">'+esc(secondarySku)+'</div>':'')+
           '</div>'+
           '<div class="label-right">'+imgHtml+'</div>';
         sheet.appendChild(cell);
