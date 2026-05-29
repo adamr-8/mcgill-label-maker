@@ -228,7 +228,7 @@
   <img id="headerLogo" alt="McGill Hose &amp; Coupling">
   <div>
     <h1>VMI Bin Label Maker</h1>
-    <div class="subtitle">Avery 94216 &mdash; 3 &times; 10 (30/sheet) &mdash; 2&#x2033; &times; &#xBE;&#x2033; &mdash; v5.4</div>
+    <div class="subtitle">Avery 94216 &mdash; 3 &times; 10 (30/sheet) &mdash; 2&#x2033; &times; &#xBE;&#x2033; &mdash; v5.5</div>
   </div>
 </header>
 
@@ -567,38 +567,43 @@ async function parsePDF(file) {
   labels = parsed;
 }
 
-// Fetch and resize an image URL to a label-friendly data URL
-// Target: 150x150px (crisp at print DPI for the ~0.48in label column)
+// Proxy any image URL through wsrv.nl — solves CORS and resizes server-side
+function proxyImageUrl(url, size) {
+  size = size || 150;
+  // Don't double-wrap if already proxied
+  if (url.indexOf('wsrv.nl') >= 0) return url;
+  return 'https://wsrv.nl/?url=' + encodeURIComponent(url) + '&w=' + size + '&h=' + size + '&fit=contain&bg=white';
+}
+
+// Fetch a (proxied) image URL and convert to data URL for embedding in labels
 function fetchImageAsDataUrl(url, size) {
   size = size || 150;
+  var proxied = proxyImageUrl(url, size);
   return new Promise(function(resolve) {
     var img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = function() {
       try {
         var c = document.createElement('canvas');
-        // Fit within size x size, maintaining aspect ratio
-        var scale = Math.min(size / img.width, size / img.height, 1);
-        c.width = Math.round(img.width * scale);
-        c.height = Math.round(img.height * scale);
+        c.width = img.naturalWidth || img.width;
+        c.height = img.naturalHeight || img.height;
         var ctx = c.getContext('2d');
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, c.width, c.height);
-        ctx.drawImage(img, 0, 0, c.width, c.height);
+        ctx.drawImage(img, 0, 0);
         resolve(c.toDataURL('image/jpeg', 0.85));
       } catch (e) {
-        // CORS tainted canvas — fall back to using the URL directly
-        console.warn('Canvas tainted for', url, '— using URL directly');
-        resolve(url);
+        // Fallback: use the proxied URL directly (still CORS-safe via wsrv.nl)
+        console.warn('Canvas export failed for', url, '— using proxied URL');
+        resolve(proxied);
       }
     };
     img.onerror = function() {
-      console.warn('Failed to load image:', url);
+      console.warn('Failed to load image (even via proxy):', url);
       resolve(null);
     };
-    // Timeout after 8 seconds
-    setTimeout(function() { if (!img.complete) { img.src = ''; resolve(null); } }, 8000);
-    img.src = url;
+    setTimeout(function() { if (!img.complete) { img.src = ''; resolve(null); } }, 10000);
+    img.src = proxied;
   });
 }
 
