@@ -228,7 +228,7 @@
   <img id="headerLogo" alt="McGill Hose &amp; Coupling">
   <div>
     <h1>VMI Bin Label Maker</h1>
-    <div class="subtitle">Avery 94216 &mdash; 3 &times; 10 (30/sheet) &mdash; 2&#x2033; &times; &#xBE;&#x2033; &mdash; v5.5</div>
+    <div class="subtitle">Avery 94216 &mdash; 3 &times; 10 (30/sheet) &mdash; 2&#x2033; &times; &#xBE;&#x2033; &mdash; v5.7</div>
   </div>
 </header>
 
@@ -396,10 +396,46 @@ async function handleFile(file) {
   var bar = document.getElementById('loadingBar');
   bar.classList.add('active');
   try {
-    if (ext === 'pdf') await parsePDF(file);
-    else if (['xls','xlsx','csv'].indexOf(ext) >= 0) await parseSpreadsheet(file);
+    var newLabels;
+    if (ext === 'pdf') newLabels = await parsePDF(file);
+    else if (['xls','xlsx','csv'].indexOf(ext) >= 0) newLabels = await parseSpreadsheet(file);
     else { showToast('Unsupported file type', true); bar.classList.remove('active'); return; }
-    showToast('Imported ' + labels.length + ' labels from ' + file.name);
+
+    // If labels already exist, ask whether to append or replace
+    if (labels.length > 0 && newLabels.length > 0) {
+      var action = await new Promise(function(resolve) {
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;display:flex;align-items:center;justify-content:center;';
+        var box = document.createElement('div');
+        box.style.cssText = 'background:#fff;border-radius:12px;padding:28px 32px;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.25);text-align:center;font-family:Arial,sans-serif;';
+        box.innerHTML =
+          '<div style="font-size:16px;font-weight:700;color:#1a5632;margin-bottom:12px">You already have ' + labels.length + ' labels loaded</div>' +
+          '<div style="font-size:14px;color:#444;margin-bottom:20px">' + newLabels.length + ' new labels from <strong>' + file.name + '</strong></div>' +
+          '<div style="display:flex;gap:10px;justify-content:center">' +
+            '<button id="_mergeAppend" style="padding:10px 20px;border:none;border-radius:6px;background:#1a5632;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Add to Existing</button>' +
+            '<button id="_mergeReplace" style="padding:10px 20px;border:none;border-radius:6px;background:#e74c3c;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Replace All</button>' +
+            '<button id="_mergeCancel" style="padding:10px 20px;border:none;border-radius:6px;background:#ddd;color:#333;font-size:14px;font-weight:600;cursor:pointer">Cancel</button>' +
+          '</div>';
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+        document.getElementById('_mergeAppend').onclick = function() { document.body.removeChild(overlay); resolve('append'); };
+        document.getElementById('_mergeReplace').onclick = function() { document.body.removeChild(overlay); resolve('replace'); };
+        document.getElementById('_mergeCancel').onclick = function() { document.body.removeChild(overlay); resolve('cancel'); };
+      });
+      if (action === 'append') {
+        labels = labels.concat(newLabels);
+        showToast('Added ' + newLabels.length + ' labels (' + labels.length + ' total)');
+      } else if (action === 'replace') {
+        labels = newLabels;
+        showToast('Replaced with ' + labels.length + ' labels from ' + file.name);
+      } else {
+        bar.classList.remove('active');
+        return;
+      }
+    } else {
+      labels = newLabels;
+      showToast('Imported ' + labels.length + ' labels from ' + file.name);
+    }
     renderTable();
   } catch(err) { console.error(err); showToast('Error: '+err.message, true); }
   bar.classList.remove('active');
@@ -514,10 +550,11 @@ async function parsePDF(file) {
         // Image width in pts = |ctm[0]| (for non-rotated), height = |ctm[3]|
         var imgWpt = Math.abs(ctm[0]);
         var imgHpt = Math.abs(ctm[3]);
-        // Filter: product images are roughly square (~30x30pt)
+        // Filter: product images are tall-ish and not wide-flat
         // Logos are wide and short (~20-27pt x 8-11pt, aspect ratio > 2)
+        // Product images vary: ~30x30pt typical, but some as small as 10x17pt
         var aspect = imgWpt / Math.max(imgHpt, 0.1);
-        if (imgHpt > 18 && aspect < 1.8) {
+        if (imgHpt > 12 && aspect < 1.8) {
           // This is a product image — compute canvas crop coordinates
           // Page coords: bottom-left at (ctm[4], ctm[5])
           // Canvas coords (top-left origin, scaled):
@@ -564,7 +601,7 @@ async function parsePDF(file) {
   for (var ci = 0; ci < parsed.length; ci++) {
     delete parsed[ci].pageNum;
   }
-  labels = parsed;
+  return parsed;
 }
 
 // Proxy any image URL through wsrv.nl — solves CORS and resizes server-side
@@ -658,7 +695,7 @@ async function parseSpreadsheet(file) {
   for (var ci = 0; ci < parsed.length; ci++) {
     delete parsed[ci]._imageUrl;
   }
-  labels = parsed;
+  return parsed;
 }
 
 // Table rendering
