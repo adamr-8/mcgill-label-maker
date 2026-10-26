@@ -192,42 +192,53 @@
   /* Avery 5163 overrides (2" × 4" labels) */
   .label-cell.size-5163 {
     width: 4in; height: 2in;
-    grid-template-columns: 0.85in 1fr 0.95in;
+    grid-template-columns: 0.82in 1fr 1.15in;
   }
   .size-5163 .label-left {
-    padding: 6px 4px;
+    padding: 8px 6px;
   }
   .size-5163 .label-left .ll-logo {
-    max-height: 36px;
+    max-height: 40px;
+    width: 90%;
   }
   .size-5163 .label-left .ll-qr {
-    width: 60px; height: 60px;
-    margin-bottom: 16px;
+    width: 64px; height: 64px;
+    margin-bottom: 12px;
   }
   .size-5163 .label-left .ll-qr img {
-    width: 60px; height: 60px;
+    width: 64px; height: 64px;
   }
   .size-5163 .label-mid {
-    padding: 6px 10px;
+    padding: 8px 10px;
+    justify-content: flex-start;
+    gap: 3px;
   }
   .size-5163 .label-mid .lm-sku {
-    font-size: 24px;
-    letter-spacing: .5px;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: .4px;
+    margin-top: 4px;
   }
   .size-5163 .label-mid .lm-desc {
-    font-size: 12px;
+    font-size: 13px;
+    line-height: 1.35;
     margin-top: 4px;
     -webkit-line-clamp: 4;
+    color: #222;
   }
   .size-5163 .label-mid .lm-alt {
-    font-size: 14px;
-    margin-top: 4px;
+    font-size: 15px;
+    font-weight: 700;
+    margin-top: 6px;
   }
   .size-5163 .label-right {
-    padding: 6px;
+    padding: 8px;
+  }
+  .size-5163 .label-right img {
+    border-radius: 4px;
   }
   .size-5163 .label-right .lr-placeholder {
-    font-size: 9px;
+    font-size: 10px;
   }
 
   @media print {
@@ -586,7 +597,7 @@ async function parsePDF(file) {
       parsed.push({
         sku: sku, description: description, altSku: altSku,
         qty: 1, imageData: null, qrPath: '',
-        pageNum: p
+        pageNum: p, _anchorX: anchor.x, _anchorY: anchor.y
       });
     }
 
@@ -635,13 +646,39 @@ async function parsePDF(file) {
       }
     }
 
-    // Sort product rects top-to-bottom, left-to-right (to match label order)
-    productRects.sort(function(a, b) { return a.y - b.y || a.x - b.x; });
-
-    // Crop each product image from the rendered canvas
+    // Position-based image matching: for each label anchor, find the
+    // rightmost filtered image within its bounding box. Product images
+    // sit to the RIGHT of the text in Danfoss labels; logos sit to the LEFT.
     var pageLabels = parsed.filter(function(l) { return l.pageNum === p; });
-    for (var ri = 0; ri < productRects.length && ri < pageLabels.length; ri++) {
-      var r = productRects[ri];
+    var usedImages = [];
+
+    for (var li = 0; li < pageLabels.length; li++) {
+      var label = pageLabels[li];
+      var ax = label._anchorX;
+      var ay = label._anchorY;
+
+      // Find the rightmost candidate image near this anchor
+      var bestIdx = -1;
+      var bestX = -1;
+      for (var ri = 0; ri < productRects.length; ri++) {
+        if (usedImages.indexOf(ri) >= 0) continue;
+        var r = productRects[ri];
+        // Convert canvas coords back to page-space for comparison
+        var imgX = r.x / RENDER_SCALE;
+        var imgY = r.y / RENDER_SCALE;
+        // Image must be within this label's approximate area
+        if (imgY >= ay - 15 && imgY <= ay + 60 &&
+            imgX >= ax - 30 && imgX <= ax + 160) {
+          if (imgX > bestX) {
+            bestX = imgX;
+            bestIdx = ri;
+          }
+        }
+      }
+
+      if (bestIdx < 0) continue;
+      usedImages.push(bestIdx);
+      var r = productRects[bestIdx];
       var rx = Math.max(0, Math.round(r.x));
       var ry = Math.max(0, Math.round(r.y));
       var rw = Math.round(r.w);
@@ -656,18 +693,20 @@ async function parsePDF(file) {
         cropCanvas.height = rh;
         var cropCtx = cropCanvas.getContext('2d');
         cropCtx.drawImage(canvas, rx, ry, rw, rh, 0, 0, rw, rh);
-        pageLabels[ri].imageData = cropCanvas.toDataURL('image/png');
+        label.imageData = cropCanvas.toDataURL('image/png');
       } catch (e) {
-        console.warn('Image crop failed for label', ri, e);
+        console.warn('Image crop failed for label', li, e);
       }
     }
     // Release canvas memory before next page
     canvas.width = 1; canvas.height = 1;
   }
 
-  // Clean up internal field
+  // Clean up internal fields
   for (var ci = 0; ci < parsed.length; ci++) {
     delete parsed[ci].pageNum;
+    delete parsed[ci]._anchorX;
+    delete parsed[ci]._anchorY;
   }
   return parsed;
 }
