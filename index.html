@@ -280,7 +280,7 @@
   <img id="headerLogo" alt="McGill Hose &amp; Coupling">
   <div>
     <h1>VMI Bin Label Maker</h1>
-    <div class="subtitle" id="headerSubtitle">Avery 94216 &mdash; 3 &times; 10 (30/sheet) &mdash; v5.8</div>
+    <div class="subtitle" id="headerSubtitle">Avery 94216 &mdash; 3 &times; 10 (30/sheet) &mdash; v5.9</div>
   </div>
 </header>
 
@@ -405,7 +405,7 @@ function updateSubtitle() {
   var cfg = getSelectedSize();
   document.getElementById('headerSubtitle').innerHTML =
     cfg.name + ' &mdash; ' + cfg.cols + ' &times; ' + cfg.rows +
-    ' (' + cfg.labelsPerSheet + '/sheet) &mdash; v5.8';
+    ' (' + cfg.labelsPerSheet + '/sheet) &mdash; v5.9';
 }
 document.getElementById('labelSizeSelect').addEventListener('change', updateSubtitle);
 
@@ -647,8 +647,9 @@ async function parsePDF(file) {
     }
 
     // Position-based image matching: for each label anchor, find the
-    // rightmost filtered image within its bounding box. Product images
-    // sit to the RIGHT of the text in Danfoss labels; logos sit to the LEFT.
+    // NEAREST filtered image by Euclidean distance. Product images in
+    // Danfoss labels sit to the LEFT of the SKU text (~85pt away),
+    // so proximity matching correctly pairs each label with its own image.
     var pageLabels = parsed.filter(function(l) { return l.pageNum === p; });
     var usedImages = [];
 
@@ -657,22 +658,22 @@ async function parsePDF(file) {
       var ax = label._anchorX;
       var ay = label._anchorY;
 
-      // Find the rightmost candidate image near this anchor
+      // Find the nearest candidate image to this anchor
       var bestIdx = -1;
-      var bestX = -1;
+      var bestDist = Infinity;
       for (var ri = 0; ri < productRects.length; ri++) {
         if (usedImages.indexOf(ri) >= 0) continue;
         var r = productRects[ri];
         // Convert canvas coords back to page-space for comparison
         var imgX = r.x / RENDER_SCALE;
         var imgY = r.y / RENDER_SCALE;
-        // Image must be within this label's approximate area
-        if (imgY >= ay - 15 && imgY <= ay + 60 &&
-            imgX >= ax - 30 && imgX <= ax + 160) {
-          if (imgX > bestX) {
-            bestX = imgX;
-            bestIdx = ri;
-          }
+        var dx = imgX - ax;
+        var dy = imgY - ay;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        // Max 200pt prevents matching across distant page regions
+        if (dist < bestDist && dist < 200) {
+          bestDist = dist;
+          bestIdx = ri;
         }
       }
 
